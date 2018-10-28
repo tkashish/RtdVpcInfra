@@ -1,0 +1,30 @@
+#!/bin/bash
+
+validate_template(){
+  echo "runnig aws validate"
+  cf_template_path=$1
+  aws cloudformation validate-template --template-body file://$cf_template_path
+  cf_validation_check=`echo $?`
+  if [ "$cf_validation_check" != "0" ]; then
+    echo "cloudformation template not valid"
+    exit 1
+  fi
+}
+
+validate_cfn_nag(){
+  cf_template_path=$1
+  echo "running cfn_nag on $cf_template_path"
+  cfn_nag_out=`cfn_nag_scan --input-path $cf_template_path --output-format json`
+  echo $cfn_nag_out | jq .
+  failure_count=`echo $cfn_nag_out | jq '.[0].file_results.failure_count'`
+  total_violation_count=`echo $cfn_nag_out | jq '.[0].file_results.violations' | jq length`
+  if [ "$failure_count" != "0" ]; then
+    echo "cloudformation template not secure"
+    exit 1
+  fi
+}
+
+cf_template=$1
+
+validate_template $cf_template
+validate_cfn_nag $cf_template
